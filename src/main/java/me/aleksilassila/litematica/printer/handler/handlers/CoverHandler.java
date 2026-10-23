@@ -247,7 +247,8 @@ public final class CoverHandler extends FeatureModuleBase {
         double interactionRange = PlayerUtils.getPlayerBlockInteractionRange();
         Vec3 hitPos = Vec3.atCenterOf(support).add(0.0D, 0.5D, 0.0D);
         if (!this.canReachIterationPosition(pos)
-                || this.player.getEyePosition().distanceToSqr(hitPos) > interactionRange * interactionRange) {
+                || (!ConfigUtils.isRemotePlaceEnabled()
+                && this.player.getEyePosition().distanceToSqr(hitPos) > interactionRange * interactionRange)) {
             this.retryTargets.add(pos.immutable());
             this.setIterationConsumedEffectiveExecution(false);
             return;

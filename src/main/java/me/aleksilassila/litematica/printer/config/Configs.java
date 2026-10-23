@@ -122,10 +122,18 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 .setVisible(Core::isSingleMode) // 仅单模式时显示
                 .build();
 
-        // 核心 - 工作半径
+        // 核心 - 工作半径（百米放方块开启时隐藏）
         public static final ConfigInteger WORK_RANGE = integer("workRange")
                 .defaultValue(6)
                 .range(1, 256)
+                .setVisible(() -> !Configs.Placement.REMOTE_PLACE.getBooleanValue())
+                .build();
+
+        // 核心 - 百米放方块工作半径（默认 49，最大 100）
+        public static final ConfigInteger REMOTE_PLACE_RANGE = integer("remotePlaceRange")
+                .defaultValue(49)
+                .range(1, 100)
+                .setVisible(Configs.Placement.REMOTE_PLACE::getBooleanValue)
                 .build();
 
         public static final ConfigInteger SCAN_TIME_BUDGET_MS = integer("scanTimeBudgetMs")
@@ -208,6 +216,7 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 FLUID,
                 COVER,
                 WORK_RANGE,
+                REMOTE_PLACE_RANGE,
                 SCAN_TIME_BUDGET_MS,
                 LAZY_ENTER_TICKS,
                 RENDER_HUD,
@@ -291,6 +300,12 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 .range(0, 64)
                 .build();
 
+        // 百米放方块：忽略客户端交互距离限制，使用与工作半径相同的形状判定。
+        // 超出原版交互距离时使用 Trouser-Streak 的传送发包方式完成放置。
+        public static final ConfigBoolean REMOTE_PLACE = bool("remotePlace")
+                .defaultValue(false)
+                .build();
+
         // RTT 自适应重放间隔 - 开关
         // 根据玩家 ping 自动把放置间隔抬到不低于一次往返,减少服务器下「发包快于服务端确认」导致的放错。
         public static final ConfigBoolean RTT_ADAPTIVE_INTERVAL = bool("placeRttAdaptiveInterval")
@@ -334,6 +349,7 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 PLACE_INTERVAL,
                 PLACE_BLOCKS_PER_TICK,
                 PLACE_COOLDOWN,
+                REMOTE_PLACE,
                 RTT_ADAPTIVE_INTERVAL,
                 RTT_SAFETY_PERCENT,
                 FALLING_CHECK

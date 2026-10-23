@@ -30,7 +30,8 @@ record ScanRegion(
             if (shape == RadiusShapeType.SPHERE || shape == RadiusShapeType.OCTAHEDRON) {
                 maxDistanceBand = Math.min(maxDistanceBand, ConfigUtils.getWorkRange() + 2);
             }
-            if (Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()) {
+            if (Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()
+                    && !ConfigUtils.isRemotePlaceEnabled()) {
                 int interactionBand = (int) Math.ceil(
                         PlayerUtils.getPlayerBlockInteractionRange(5.0D) + 3.0D
                 );

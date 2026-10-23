@@ -32,6 +32,11 @@ on:
       - 'gradlew'
       - 'gradlew.bat'
   workflow_dispatch:
+    inputs:
+      mc_versions:
+        description: 'TARGET_MC_VERSIONS (comma separated, empty = all)'
+        required: false
+        default: '1.21.11'
 
 env:
   IS_THIS_RELEASE: false
@@ -77,6 +82,8 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build fabricWrapper subproject
+        env:
+          TARGET_MC_VERSIONS: ${{ inputs.mc_versions }}
         run: ./gradlew :fabricWrapper:build -x jacocoTestCoverageVerification --stacktrace --console=plain
 
       - name: Delete wrapper sources jar

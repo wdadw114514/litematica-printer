@@ -86,12 +86,19 @@ public class ConfigUtils {
     }
 
     public static int getWorkRange() {
+        if (isRemotePlaceEnabled()) {
+            return Configs.Core.REMOTE_PLACE_RANGE.getIntegerValue();
+        }
         return Configs.Core.WORK_RANGE.getIntegerValue();
+    }
+
+    public static boolean isRemotePlaceEnabled() {
+        return Configs.Placement.REMOTE_PLACE.getBooleanValue();
     }
 
     public static boolean canInteracted(BlockPos blockPos) {
         double workRange = getWorkRange();
-        if (Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()) {
+        if (Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue() && !isRemotePlaceEnabled()) {
             if (client.player != null && !PlayerUtils.isWithinBlockInteractionRange(client.player, blockPos, 1F)) {
                 return false;
             }
@@ -132,7 +139,8 @@ public class ConfigUtils {
         int playerBlockX = playerBlockPos.getX();
         int playerBlockY = playerBlockPos.getY();
         int playerBlockZ = playerBlockPos.getZ();
-        boolean checkInteractionRange = Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue();
+        boolean checkInteractionRange = Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()
+                && !isRemotePlaceEnabled();
         double interactionRange = PlayerUtils.getPlayerBlockInteractionRange(5) + 1.0D;
         double interactionRangeSqr = interactionRange * interactionRange;
         RadiusShapeType shape = Configs.Core.ITERATOR_SHAPE.getOptionListValue() instanceof RadiusShapeType value

@@ -4,6 +4,9 @@ import me.aleksilassila.litematica.printer.interaction.MiningInteractionControll
 import me.aleksilassila.litematica.printer.interaction.MiningInteractionPort;
 import me.aleksilassila.litematica.printer.mixin_extension.BlockBreakResult;
 import me.aleksilassila.litematica.printer.mixin_extension.MultiPlayerGameModeExtension;
+//#if MC >= 12111
+import me.aleksilassila.litematica.printer.printer.RemotePlacementHelper;
+//#endif
 import me.aleksilassila.litematica.printer.utils.minecraft.NetworkUtils;
 import me.aleksilassila.litematica.printer.runtime.RuntimeAccess;
 import net.minecraft.client.Minecraft;
@@ -70,6 +73,9 @@ public abstract class MixinMultiPlayerGameMode implements MultiPlayerGameModeExt
 
     @Inject(method = "tick", at = @At("HEAD"))
     private void litematica_printer$tickMiningController(CallbackInfo ci) {
+        //#if MC >= 12111
+        RemotePlacementHelper.tick(this.minecraft);
+        //#endif
         this.litematica_printer$controller().tick();
     }
 
@@ -94,6 +100,15 @@ public abstract class MixinMultiPlayerGameMode implements MultiPlayerGameModeExt
     @Override
     public InteractionResult litematica_printer$useItemOn(
             boolean localPrediction, InteractionHand hand, BlockHitResult hit) {
+        //#if MC >= 12111
+        if (localPrediction && RemotePlacementHelper.shouldTeleport(this.minecraft.player, hit.getBlockPos())) {
+            return RemotePlacementHelper.useItemOn(
+                    this.minecraft,
+                    hit.getBlockPos(),
+                    () -> this.useItemOn(this.minecraft.player, hand, hit)
+            );
+        }
+        //#endif
         if (localPrediction) {
             //#if MC > 11802
             return this.useItemOn(this.minecraft.player, hand, hit);

@@ -64,7 +64,8 @@ final class InteractionBoxTracker {
 
     private static double getBoxRange() {
         double workRange = ConfigUtils.getWorkRange();
-        if (Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()) {
+        if (Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()
+                && !ConfigUtils.isRemotePlaceEnabled()) {
             return Math.min(workRange, PlayerUtils.getPlayerBlockInteractionRange(5) + 3.0D);
         }
         return workRange;

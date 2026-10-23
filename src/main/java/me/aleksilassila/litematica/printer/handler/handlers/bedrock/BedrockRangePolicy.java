@@ -18,7 +18,8 @@ final class BedrockRangePolicy {
         if (pos == null || !isWithinWorkRange(pos)) {
             return false;
         }
-        if (!Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()) {
+        if (!Configs.Core.CHECK_PLAYER_INTERACTION_RANGE.getBooleanValue()
+                || ConfigUtils.isRemotePlaceEnabled()) {
             return true;
         }
         LocalPlayer player = ConfigUtils.client.player;
