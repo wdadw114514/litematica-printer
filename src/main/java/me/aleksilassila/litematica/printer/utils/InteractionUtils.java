@@ -7,6 +7,9 @@ import me.aleksilassila.litematica.printer.enums.ExcavateListMode;
 import me.aleksilassila.litematica.printer.mixin_extension.BlockBreakResult;
 import me.aleksilassila.litematica.printer.mixin_extension.MultiPlayerGameModeExtension;
 import me.aleksilassila.litematica.printer.printer.SchematicBlockContext;
+//#if MC >= 12111
+import me.aleksilassila.litematica.printer.printer.RemotePlacementHelper;
+//#endif
 import me.aleksilassila.litematica.printer.utils.mods.ModLoadUtils;
 import me.aleksilassila.litematica.printer.utils.mods.TweakerooUtils;
 import net.fabricmc.api.EnvType;
@@ -207,6 +210,20 @@ public final class InteractionUtils implements RuntimeComponent {
     }
 
     public BlockBreakResult continueDestroyBlock(final BlockPos blockPos, Direction direction, boolean localPrediction, boolean trackBreakPos) {
+        //#if MC >= 12111
+        if (RemotePlacementHelper.shouldUseRemote(blockPos)) {
+            return RemotePlacementHelper.runRemoteAction(
+                    client,
+                    blockPos,
+                    () -> continueDestroyBlockLocal(blockPos, direction, localPrediction, trackBreakPos),
+                    BlockBreakResult.FAILED
+            );
+        }
+        //#endif
+        return continueDestroyBlockLocal(blockPos, direction, localPrediction, trackBreakPos);
+    }
+
+    private BlockBreakResult continueDestroyBlockLocal(final BlockPos blockPos, Direction direction, boolean localPrediction, boolean trackBreakPos) {
         MultiPlayerGameModeExtension gameMode = (@Nullable MultiPlayerGameModeExtension) client.gameMode;
         if (gameMode == null || blockPos == null || direction == null) {
             return BlockBreakResult.FAILED;
@@ -239,6 +256,20 @@ public final class InteractionUtils implements RuntimeComponent {
     }
 
     public BlockBreakResult continueDestroyBlockForMine(BlockPos blockPos, Direction direction, boolean allowToolSwitch) {
+        //#if MC >= 12111
+        if (RemotePlacementHelper.shouldUseRemote(blockPos)) {
+            return RemotePlacementHelper.runRemoteAction(
+                    client,
+                    blockPos,
+                    () -> continueDestroyBlockForMineLocal(blockPos, direction, allowToolSwitch),
+                    BlockBreakResult.FAILED
+            );
+        }
+        //#endif
+        return continueDestroyBlockForMineLocal(blockPos, direction, allowToolSwitch);
+    }
+
+    private BlockBreakResult continueDestroyBlockForMineLocal(BlockPos blockPos, Direction direction, boolean allowToolSwitch) {
         MultiPlayerGameModeExtension gameMode = (@Nullable MultiPlayerGameModeExtension) client.gameMode;
         if (gameMode == null) {
             return BlockBreakResult.FAILED;

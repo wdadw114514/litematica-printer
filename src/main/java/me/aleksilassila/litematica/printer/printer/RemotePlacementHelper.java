@@ -17,6 +17,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -24,20 +25,20 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Long distance placement inspired by Trouser-Streak's Infinite Reach,
- * LiquidBounce's TpAura and SlimefunHelper's faraway movement.
+ * TpAura style long distance actions for the printer.
  *
- * <p>The client position is moved together with the server position. The move
- * itself uses status-only filler packets followed by one destination packet,
- * matching SlimefunHelper's farawayMoveFromTo. A short watch window detects the
- * case where the outbound teleport was accepted but the return packet was not,
- * and restores the original position.</p>
+ * <p>The route is sampled at one block intervals and every sample must be free
+ * of collision for the player box. Moves are sent in at most five block steps so
+ * no individual position packet can be rejected as a long jump. Both the client
+ * and server positions are kept in sync. If the server pulls the client back
+ * after the action, the saved original position is restored on the next tick.</p>
  */
 public final class RemotePlacementHelper {
     private static final String PATH_HIGHLIGHT_ID = "remote_place_path";
     private static final String TARGET_HIGHLIGHT_ID = "remote_place_target";
     private static final double SEARCH_RADIUS = 4.0D;
     private static final double SEARCH_STEP = 0.5D;
+    private static final double PACKET_STEP = 5.0D;
     private static final double RETURN_DISTANCE_SQR = 16.0D;
     private static final double TELEPORT_DISTANCE_SQR = 64.0D;
     private static final int RETURN_CHECK_DELAY_TICKS = 1;
@@ -55,6 +56,8 @@ public final class RemotePlacementHelper {
     private static Vec3 pendingReturnPos;
     @Nullable
     private static Vec3 pendingTeleportPos;
+    @Nullable
+    private static Vec3 expectedPos;
     private static long pendingReturnCheckTick;
     private static boolean pathRendered;
 
@@ -65,11 +68,12 @@ public final class RemotePlacementHelper {
         return Configs.Placement.REMOTE_PLACE.getBooleanValue();
     }
 
-    public static boolean shouldTeleport(@Nullable LocalPlayer player, @Nullable BlockPos target) {
+    public static boolean shouldUseRemote(@Nullable BlockPos target) {
+        Minecraft minecraft = Minecraft.getInstance();
         return isEnabled()
-                && player != null
                 && target != null
-                && !PlayerUtils.isWithinBlockInteractionRange(player, target, 0.0D);
+                && minecraft.player != null
+                && !PlayerUtils.isWithinBlockInteractionRange(minecraft.player, target, 0.0D);
     }
 
     public static InteractionResult useItemOn(
@@ -77,30 +81,42 @@ public final class RemotePlacementHelper {
             BlockPos target,
             Supplier<InteractionResult> localAction
     ) {
+        return runRemoteAction(minecraft, target, localAction, InteractionResult.FAIL);
+    }
+
+    public static <T> T runRemoteAction(
+            Minecraft minecraft,
+            BlockPos target,
+            Supplier<T> action,
+            T fallback
+    ) {
         LocalPlayer player = minecraft.player;
         ClientLevel level = minecraft.level;
         if (player == null || level == null) {
-            return InteractionResult.FAIL;
+            return fallback;
         }
-        Vec3 teleportPos = findTeleportPos(level, player, target);
-        if (teleportPos == null) {
-            return InteractionResult.FAIL;
+        TeleportPlan plan = findTeleportPlan(level, player, target);
+        if (plan == null) {
+            return fallback;
         }
         Vec3 originalPos = player.position();
         pendingReturnPos = originalPos;
-        pendingTeleportPos = teleportPos;
+        pendingTeleportPos = plan.destination();
+        expectedPos = originalPos;
         pendingReturnCheckTick = level.getGameTime() + RETURN_CHECK_DELAY_TICKS;
         List<Vec3> renderPath = new ArrayList<>();
         try {
-            sendMove(player, originalPos, teleportPos, renderPath);
-            return localAction.get();
+            sendPath(player, plan.path(), true, renderPath);
+            expectedPos = plan.destination();
+            return action.get();
         } finally {
-            sendMove(player, teleportPos, originalPos, renderPath);
-            updatePathRender(renderPath, teleportPos);
+            sendPath(player, plan.path(), false, renderPath);
+            expectedPos = originalPos;
+            updatePathRender(renderPath, plan.destination());
         }
     }
 
-    /** Restores the original position when the outbound teleport was not undone. */
+    /** Restores the original position when the server pulled the client away. */
     public static void tick(Minecraft minecraft) {
         if (!Configs.Placement.REMOTE_PLACE_RENDER_PATH.getBooleanValue()) {
             clearPathRender();
@@ -128,44 +144,147 @@ public final class RemotePlacementHelper {
             clearPending();
             return;
         }
+        Vec3 expected = expectedPos;
+        if (expected != null && currentPos.distanceToSqr(expected) > RETURN_DISTANCE_SQR) {
+            player.setPos(expected.x, expected.y, expected.z);
+            NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
+                    expected.x, expected.y, expected.z,
+                    player.onGround(), player.horizontalCollision));
+            return;
+        }
         Vec3 teleportPos = pendingTeleportPos;
         if (teleportPos != null && currentPos.distanceToSqr(teleportPos) <= TELEPORT_DISTANCE_SQR) {
-            restorePosition(player, originalPos, teleportPos);
+            restorePosition(player, originalPos);
         }
     }
 
-    private static void restorePosition(LocalPlayer player, Vec3 originalPos, Vec3 teleportPos) {
+    private static void restorePosition(LocalPlayer player, Vec3 originalPos) {
         player.setPos(originalPos.x, originalPos.y, originalPos.z);
-        sendMove(player, teleportPos, originalPos, null);
+        NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
+                originalPos.x, originalPos.y, originalPos.z,
+                player.onGround(), player.horizontalCollision));
         clearPending();
     }
 
+    private static void clearPending() {
+        pendingReturnPos = null;
+        pendingTeleportPos = null;
+        expectedPos = null;
+    }
+
     /**
-     * Status-only filler packets followed by one destination packet. This mirrors
-     * SlimefunHelper's farawayMoveFromTo and avoids the per-packet distance
-     * rejection that splitting a long move into many position packets can cause.
+     * Sends the route in at most five block steps. Each step is a normal
+     * position packet, which stays far below the server move limits.
      */
-    private static void sendMove(LocalPlayer player, Vec3 from, Vec3 to, @Nullable List<Vec3> renderPath) {
-        double distance = from.distanceTo(to);
-        if (distance < 1.0E-4D) {
+    private static void sendPath(
+            LocalPlayer player,
+            List<Vec3> path,
+            boolean forward,
+            @Nullable List<Vec3> renderPath
+    ) {
+        if (path.isEmpty()) {
             return;
         }
-        int fillerPackets = (int) ((distance + 1.0D) / 10.0D);
-        for (int i = 0; i < fillerPackets; i++) {
-            NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.StatusOnly(
-                    player.onGround(), player.horizontalCollision));
-        }
-        NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
-                to.x, to.y, to.z, player.onGround(), player.horizontalCollision));
-        // Keep the client in sync with the position packets. Otherwise the next
-        // client move packet snaps the server back and the placement is rejected.
-        player.setPos(to.x, to.y, to.z);
-        if (renderPath != null) {
-            int renderSteps = Math.max(1, (int) Math.ceil(distance));
-            for (int i = 1; i <= renderSteps; i++) {
-                renderPath.add(from.add(to.subtract(from).scale((double) i / renderSteps)));
+        List<Vec3> points = forward ? path : reversed(path);
+        Vec3 lastSent = null;
+        for (int i = 0; i < points.size(); i++) {
+            Vec3 point = points.get(i);
+            boolean last = i == points.size() - 1;
+            if (last || lastSent == null || point.distanceTo(lastSent) >= PACKET_STEP) {
+                NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
+                        point.x, point.y, point.z,
+                        player.onGround(), player.horizontalCollision));
+                player.setPos(point.x, point.y, point.z);
+                lastSent = point;
+            }
+            if (renderPath != null) {
+                renderPath.add(point);
             }
         }
+    }
+
+    private static List<Vec3> reversed(List<Vec3> path) {
+        List<Vec3> reversed = new ArrayList<>(path);
+        Collections.reverse(reversed);
+        return reversed;
+    }
+
+    @Nullable
+    private static TeleportPlan findTeleportPlan(ClientLevel level, LocalPlayer player, BlockPos target) {
+        Vec3 center = Vec3.atCenterOf(target);
+        Vec3 playerPos = player.position();
+
+        // Prefer the air pocket between the player and the target. Walls around
+        // schematic blocks are common, and this side is usually open.
+        Vec3 towardPlayer = playerPos.subtract(center);
+        if (towardPlayer.lengthSqr() > 1.0E-6D) {
+            Vec3 direction = towardPlayer.normalize();
+            for (double distance = 2.0D; distance <= 4.0D; distance += 0.5D) {
+                TeleportPlan plan = planFor(level, player, target, center.add(direction.scale(distance)));
+                if (plan != null) {
+                    return plan;
+                }
+            }
+        }
+
+        for (Vec3 offset : SEARCH_OFFSETS) {
+            TeleportPlan plan = planFor(level, player, target, center.add(offset));
+            if (plan != null) {
+                return plan;
+            }
+        }
+
+        BlockPos above = target.above();
+        if (level.hasChunkAt(above)) {
+            return planFor(level, player, target, new Vec3(center.x, target.getY() + 1.0D, center.z));
+        }
+        return null;
+    }
+
+    @Nullable
+    private static TeleportPlan planFor(ClientLevel level, LocalPlayer player, BlockPos target, Vec3 destination) {
+        BlockPos destinationBlock = BlockPos.containing(destination);
+        if (destinationBlock.equals(target) || !level.hasChunkAt(destinationBlock)) {
+            return null;
+        }
+        if (!level.getFluidState(destinationBlock).isEmpty()) {
+            return null;
+        }
+        Vec3 playerPos = player.position();
+        if (!level.noCollision(player, player.getBoundingBox().move(destination.subtract(playerPos)))) {
+            return null;
+        }
+        List<Vec3> path = buildPath(level, player, playerPos, destination);
+        if (path == null) {
+            return null;
+        }
+        return new TeleportPlan(destination, path);
+    }
+
+    /**
+     * Samples the route at one block intervals. Any collision along the route
+     * invalidates it, which prevents the server from pulling the player back
+     * because the route crossed a wall.
+     */
+    @Nullable
+    private static List<Vec3> buildPath(ClientLevel level, LocalPlayer player, Vec3 from, Vec3 to) {
+        Vec3 delta = to.subtract(from);
+        double distance = delta.length();
+        if (distance < 1.0E-4D) {
+            return List.of();
+        }
+        int samples = Math.max(1, (int) Math.ceil(distance));
+        AABB baseBox = player.getBoundingBox();
+        Vec3 basePos = player.position();
+        List<Vec3> path = new ArrayList<>(samples);
+        for (int i = 1; i <= samples; i++) {
+            Vec3 point = from.add(delta.scale((double) i / samples));
+            if (!level.noCollision(player, baseBox.move(point.subtract(basePos)))) {
+                return null;
+            }
+            path.add(point);
+        }
+        return path;
     }
 
     private static void updatePathRender(List<Vec3> path, Vec3 target) {
@@ -191,65 +310,6 @@ public final class RemotePlacementHelper {
         pathRendered = false;
     }
 
-    private static void clearPending() {
-        pendingReturnPos = null;
-        pendingTeleportPos = null;
-    }
-
-    @Nullable
-    private static Vec3 findTeleportPos(ClientLevel level, LocalPlayer player, BlockPos target) {
-        Vec3 center = Vec3.atCenterOf(target);
-        Vec3 playerPos = player.position();
-        AABB playerBox = player.getBoundingBox();
-
-        // Prefer a spot between the player and the target. Walls are common around
-        // schematic blocks; the player-side air pocket keeps the target inside the
-        // server interaction range without putting the player inside a block.
-        Vec3 towardPlayer = playerPos.subtract(center);
-        if (towardPlayer.lengthSqr() > 1.0E-6D) {
-            Vec3 direction = towardPlayer.normalize();
-            for (double distance = 2.0D; distance <= 4.0D; distance += 0.5D) {
-                Vec3 candidate = center.add(direction.scale(distance));
-                if (isValidTeleportPos(level, player, playerBox, playerPos, target, candidate)) {
-                    return candidate;
-                }
-            }
-        }
-
-        for (Vec3 offset : SEARCH_OFFSETS) {
-            Vec3 candidate = center.add(offset);
-            if (isValidTeleportPos(level, player, playerBox, playerPos, target, candidate)) {
-                return candidate;
-            }
-        }
-
-        // Last resort: directly above the target. Position packets are not
-        // collision-validated by the server, and the target stays in range.
-        BlockPos above = target.above();
-        if (level.hasChunkAt(above)) {
-            return new Vec3(center.x, target.getY() + 1.0D, center.z);
-        }
-        return null;
-    }
-
-    private static boolean isValidTeleportPos(
-            ClientLevel level,
-            LocalPlayer player,
-            AABB playerBox,
-            Vec3 playerPos,
-            BlockPos target,
-            Vec3 candidate
-    ) {
-        BlockPos candidateBlock = BlockPos.containing(candidate);
-        if (candidateBlock.equals(target) || !level.hasChunkAt(candidateBlock)) {
-            return false;
-        }
-        if (!level.getFluidState(candidateBlock).isEmpty()) {
-            return false;
-        }
-        return level.noCollision(player, playerBox.move(candidate.subtract(playerPos)));
-    }
-
     private static List<Vec3> buildSearchOffsets() {
         int steps = (int) Math.round(SEARCH_RADIUS / SEARCH_STEP);
         List<Vec3> offsets = new ArrayList<>();
@@ -265,6 +325,9 @@ public final class RemotePlacementHelper {
         }
         offsets.sort(Comparator.comparingDouble(Vec3::lengthSqr));
         return List.copyOf(offsets);
+    }
+
+    private record TeleportPlan(Vec3 destination, List<Vec3> path) {
     }
 }
 //#endif
