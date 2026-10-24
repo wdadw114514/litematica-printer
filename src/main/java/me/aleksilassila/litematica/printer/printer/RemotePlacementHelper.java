@@ -1,4 +1,4 @@
-﻿//#if MC >= 12111
+//#if MC >= 12111
 package me.aleksilassila.litematica.printer.printer;
 
 import fi.dy.masa.malilib.config.options.ConfigColor;

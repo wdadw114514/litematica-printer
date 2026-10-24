@@ -1,4 +1,4 @@
-﻿package me.aleksilassila.litematica.printer.utils;
+package me.aleksilassila.litematica.printer.utils;
 
 import fi.dy.masa.malilib.config.options.ConfigOptionList;
 import me.aleksilassila.litematica.printer.config.Configs;
