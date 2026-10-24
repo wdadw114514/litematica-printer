@@ -167,6 +167,14 @@ public final class RemotePlacementHelper {
             }
             return candidate;
         }
+        // Walls and ceilings rarely have a full player-sized pocket nearby. The
+        // server does not validate player collision on a position packet, so a
+        // spot directly above the target is still accepted and keeps the target
+        // inside interaction range.
+        BlockPos above = target.above();
+        if (level.hasChunkAt(above)) {
+            return new Vec3(center.x, target.getY() + 1.0D, center.z);
+        }
         return null;
     }
 
