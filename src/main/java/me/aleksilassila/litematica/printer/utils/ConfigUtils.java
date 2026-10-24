@@ -1,4 +1,4 @@
-package me.aleksilassila.litematica.printer.utils;
+﻿package me.aleksilassila.litematica.printer.utils;
 
 import fi.dy.masa.malilib.config.options.ConfigOptionList;
 import me.aleksilassila.litematica.printer.config.Configs;
@@ -93,7 +93,7 @@ public class ConfigUtils {
     }
 
     public static boolean isRemotePlaceEnabled() {
-        return Configs.Placement.REMOTE_PLACE.getBooleanValue();
+        return Configs.Special.REMOTE_PLACE.getBooleanValue();
     }
 
     public static boolean canInteracted(BlockPos blockPos) {

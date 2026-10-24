@@ -126,14 +126,14 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
         public static final ConfigInteger WORK_RANGE = integer("workRange")
                 .defaultValue(6)
                 .range(1, 256)
-                .setVisible(() -> !Configs.Placement.REMOTE_PLACE.getBooleanValue())
+                .setVisible(() -> !Configs.Special.REMOTE_PLACE.getBooleanValue())
                 .build();
 
-        // 核心 - 百米放方块工作半径（默认 49，最大 100）
+        // 核心 - 百米工作半径（默认 49，最大 100）
         public static final ConfigInteger REMOTE_PLACE_RANGE = integer("remotePlaceRange")
                 .defaultValue(49)
                 .range(1, 100)
-                .setVisible(Configs.Placement.REMOTE_PLACE::getBooleanValue)
+                .setVisible(Configs.Special.REMOTE_PLACE::getBooleanValue)
                 .build();
 
         public static final ConfigInteger SCAN_TIME_BUDGET_MS = integer("scanTimeBudgetMs")
@@ -245,6 +245,17 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 .setVisible(ModLoadUtils::isTweakerooLoaded)
                 .build();
 
+        // 百米放方块/破坏：忽略客户端交互距离限制，使用与工作半径相同的形状判定。
+        public static final ConfigBoolean REMOTE_PLACE = bool("remotePlace")
+                .defaultValue(false)
+                .build();
+
+        // 百米放方块 - 显示传送寻路路径（默认关闭）
+        public static final ConfigBoolean REMOTE_PLACE_RENDER_PATH = bool("remotePlaceRenderPath")
+                .defaultValue(false)
+                .setVisible(REMOTE_PLACE::getBooleanValue)
+                .build();
+
         // Chest Tracker 远程取物开关
         public static final ConfigBooleanHotkeyed REMOTE_TAKE = booleanHotkey("remoteTake")
                 .defaultValue(false)
@@ -268,6 +279,8 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 UNLOCK_BEACON_EFFECTS,
                 //#endif
                 TWEAKEROO_ANGEL_BLOCK_MAY_BUILD,
+                REMOTE_PLACE,
+                REMOTE_PLACE_RENDER_PATH,
                 Placement.QUICK_SHULKER,
                 Placement.QUICK_SHULKER_MODE,
                 Placement.QUICK_SHULKER_COOLDOWN,
@@ -298,18 +311,6 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
         public static final ConfigInteger PLACE_COOLDOWN = integer("placeCooldown")
                 .defaultValue(8)
                 .range(0, 64)
-                .build();
-
-        // 百米放方块：忽略客户端交互距离限制，使用与工作半径相同的形状判定。
-        // 超出原版交互距离时使用 Trouser-Streak 的传送发包方式完成放置。
-        public static final ConfigBoolean REMOTE_PLACE = bool("remotePlace")
-                .defaultValue(false)
-                .build();
-
-        // 百米放方块 - 显示传送寻路路径（默认关闭）
-        public static final ConfigBoolean REMOTE_PLACE_RENDER_PATH = bool("remotePlaceRenderPath")
-                .defaultValue(false)
-                .setVisible(REMOTE_PLACE::getBooleanValue)
                 .build();
 
         // RTT 自适应重放间隔 - 开关
@@ -355,8 +356,6 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 PLACE_INTERVAL,
                 PLACE_BLOCKS_PER_TICK,
                 PLACE_COOLDOWN,
-                REMOTE_PLACE,
-                REMOTE_PLACE_RENDER_PATH,
                 RTT_ADAPTIVE_INTERVAL,
                 RTT_SAFETY_PERCENT,
                 FALLING_CHECK

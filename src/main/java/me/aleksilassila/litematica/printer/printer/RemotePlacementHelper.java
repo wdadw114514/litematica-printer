@@ -1,4 +1,4 @@
-//#if MC >= 12111
+﻿//#if MC >= 12111
 package me.aleksilassila.litematica.printer.printer;
 
 import fi.dy.masa.malilib.config.options.ConfigColor;
@@ -65,7 +65,7 @@ public final class RemotePlacementHelper {
     }
 
     public static boolean isEnabled() {
-        return Configs.Placement.REMOTE_PLACE.getBooleanValue();
+        return Configs.Special.REMOTE_PLACE.getBooleanValue();
     }
 
     public static boolean shouldUseRemote(@Nullable BlockPos target) {
@@ -118,7 +118,7 @@ public final class RemotePlacementHelper {
 
     /** Restores the original position when the server pulled the client away. */
     public static void tick(Minecraft minecraft) {
-        if (!Configs.Placement.REMOTE_PLACE_RENDER_PATH.getBooleanValue()) {
+        if (!Configs.Special.REMOTE_PLACE_RENDER_PATH.getBooleanValue()) {
             clearPathRender();
         }
         Vec3 originalPos = pendingReturnPos;
@@ -288,7 +288,7 @@ public final class RemotePlacementHelper {
     }
 
     private static void updatePathRender(List<Vec3> path, Vec3 target) {
-        if (!Configs.Placement.REMOTE_PLACE_RENDER_PATH.getBooleanValue()) {
+        if (!Configs.Special.REMOTE_PLACE_RENDER_PATH.getBooleanValue()) {
             clearPathRender();
             return;
         }
