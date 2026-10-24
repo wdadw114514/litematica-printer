@@ -101,7 +101,7 @@ public abstract class MixinMultiPlayerGameMode implements MultiPlayerGameModeExt
     public InteractionResult litematica_printer$useItemOn(
             boolean localPrediction, InteractionHand hand, BlockHitResult hit) {
         //#if MC >= 12111
-        if (localPrediction && RemotePlacementHelper.shouldTeleport(this.minecraft.player, hit.getBlockPos())) {
+        if (localPrediction && RemotePlacementHelper.shouldUseRemote(hit.getBlockPos())) {
             return RemotePlacementHelper.useItemOn(
                     this.minecraft,
                     hit.getBlockPos(),
