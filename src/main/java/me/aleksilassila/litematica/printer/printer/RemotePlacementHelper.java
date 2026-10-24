@@ -31,7 +31,6 @@ import java.util.function.Supplier;
  */
 public final class RemotePlacementHelper {
     private static final int STATUS_PACKETS = 4;
-    private static final int REMOTE_PLACE_COOLDOWN_TICKS = 5;
     private static final double MAX_STEP_DISTANCE = 8.0D;
     private static final double SEARCH_RADIUS = 3.0D;
     private static final double SEARCH_STEP = 0.5D;
@@ -46,7 +45,6 @@ public final class RemotePlacementHelper {
     @Nullable
     private static Vec3 pendingTeleportPos;
     private static long pendingReturnCheckTick;
-    private static long lastRemotePlaceTick = Long.MIN_VALUE;
 
     private RemotePlacementHelper() {
     }
@@ -72,15 +70,6 @@ public final class RemotePlacementHelper {
         if (player == null || level == null) {
             return InteractionResult.FAIL;
         }
-        long now = level.getGameTime();
-        if (lastRemotePlaceTick != Long.MIN_VALUE) {
-            if (now < lastRemotePlaceTick) {
-                lastRemotePlaceTick = Long.MIN_VALUE;
-            } else if (now - lastRemotePlaceTick < REMOTE_PLACE_COOLDOWN_TICKS) {
-                return InteractionResult.FAIL;
-            }
-        }
-        lastRemotePlaceTick = now;
         Vec3 teleportPos = findTeleportPos(level, player, target);
         if (teleportPos == null) {
             return InteractionResult.FAIL;
