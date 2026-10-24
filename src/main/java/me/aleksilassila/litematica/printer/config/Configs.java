@@ -306,6 +306,12 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 .defaultValue(false)
                 .build();
 
+        // 百米放方块 - 显示传送寻路路径（默认关闭）
+        public static final ConfigBoolean REMOTE_PLACE_RENDER_PATH = bool("remotePlaceRenderPath")
+                .defaultValue(false)
+                .setVisible(REMOTE_PLACE::getBooleanValue)
+                .build();
+
         // RTT 自适应重放间隔 - 开关
         // 根据玩家 ping 自动把放置间隔抬到不低于一次往返,减少服务器下「发包快于服务端确认」导致的放错。
         public static final ConfigBoolean RTT_ADAPTIVE_INTERVAL = bool("placeRttAdaptiveInterval")
@@ -350,6 +356,7 @@ public class Configs extends ConfigBuilders implements IConfigHandler {
                 PLACE_BLOCKS_PER_TICK,
                 PLACE_COOLDOWN,
                 REMOTE_PLACE,
+                REMOTE_PLACE_RENDER_PATH,
                 RTT_ADAPTIVE_INTERVAL,
                 RTT_SAFETY_PERCENT,
                 FALLING_CHECK

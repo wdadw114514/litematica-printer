@@ -128,6 +128,8 @@
   "litematica-printer.config.placeCooldown.desc": "同一位置放置方块后的冷却时间(单位为游戏刻)，冷却结束后才会重试放置操作。\n§c§l非必要请勿设置为0，否则会导致多放方块、无法正确放置等问题！§r",
   "litematica-printer.config.remotePlace": "百米放方块",
   "litematica-printer.config.remotePlace.desc": "开启后隐藏普通工作半径，改用下方的「百米工作半径」(默认 49，最大 100)，并忽略客户端 4.5 格交互距离限制。\n超出原版交互距离时会参考 Trouser-Streak 的无限距离：短暂把服务端位置传送到目标附近，放置后立即传回原位；若检测到没有回到原位会自动纠正。\n注意：部分服务器可能因此回弹或踢出，建议距离不超过 99。",
+  "litematica-printer.config.remotePlaceRenderPath": "显示传送寻路",
+  "litematica-printer.config.remotePlaceRenderPath.desc": "在世界上高亮显示百米放方块的传送路径(绿色)和目标位置(黄色)，用于排查放置失败。\n默认关闭，仅在开启「百米放方块」时显示。",
   "litematica-printer.config.placeRttAdaptiveInterval": "RTT 自适应间隔",
   "litematica-printer.config.placeRttAdaptiveInterval.desc": "根据你的延迟(ping)自动把放置间隔抬高到不低于一次往返，避免在服务端确认上一次放置之前就发出下一个，从而减少服务器下的放错/幽灵方块，高延迟时尤其有效。\n使用玩家列表的 ping 值；单机/局域网(ping 为 0)时不生效。",
   "litematica-printer.config.placeRttSafetyPercent": "RTT 安全系数",
