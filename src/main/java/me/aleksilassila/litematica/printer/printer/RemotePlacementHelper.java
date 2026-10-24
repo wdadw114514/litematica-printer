@@ -151,6 +151,9 @@ public final class RemotePlacementHelper {
             NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
                     point.x, point.y, point.z,
                     i == steps && player.onGround(), player.horizontalCollision));
+            // Keep the client in sync with the position packets. Otherwise the next
+            // client move packet snaps the server back and the placement is rejected.
+            player.setPos(point.x, point.y, point.z);
         }
     }
 
