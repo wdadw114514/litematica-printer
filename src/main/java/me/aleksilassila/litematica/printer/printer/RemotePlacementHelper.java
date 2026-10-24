@@ -31,6 +31,7 @@ import java.util.function.Supplier;
  */
 public final class RemotePlacementHelper {
     private static final int STATUS_PACKETS = 4;
+    private static final double MAX_STEP_DISTANCE = 8.0D;
     private static final double SEARCH_RADIUS = 3.0D;
     private static final double SEARCH_STEP = 0.5D;
     private static final double RETURN_DISTANCE_SQR = 16.0D;
@@ -82,13 +83,10 @@ public final class RemotePlacementHelper {
                 NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.StatusOnly(
                         player.onGround(), player.horizontalCollision));
             }
-            NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
-                    teleportPos.x, teleportPos.y, teleportPos.z, false, false));
+            sendMovePath(player, originalPos, teleportPos);
             return localAction.get();
         } finally {
-            NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
-                    originalPos.x, originalPos.y, originalPos.z,
-                    player.onGround(), player.horizontalCollision));
+            sendMovePath(player, teleportPos, originalPos);
         }
     }
 
@@ -119,16 +117,30 @@ public final class RemotePlacementHelper {
         }
         Vec3 teleportPos = pendingTeleportPos;
         if (teleportPos != null && currentPos.distanceToSqr(teleportPos) <= TELEPORT_DISTANCE_SQR) {
-            restorePosition(player, originalPos);
+            restorePosition(player, originalPos, teleportPos);
         }
     }
 
-    private static void restorePosition(LocalPlayer player, Vec3 target) {
-        player.setPos(target.x, target.y, target.z);
-        NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
-                target.x, target.y, target.z,
-                player.onGround(), player.horizontalCollision));
+    private static void restorePosition(LocalPlayer player, Vec3 originalPos, Vec3 teleportPos) {
+        player.setPos(originalPos.x, originalPos.y, originalPos.z);
+        sendMovePath(player, teleportPos, originalPos);
         clearPending();
+    }
+
+    /**
+     * Splits a long move into sub-10 block steps. Vanilla rejects a single
+     * move larger than 10 blocks ("moved too quickly"); stepping keeps every
+     * packet inside that limit while still ending at the destination.
+     */
+    private static void sendMovePath(LocalPlayer player, Vec3 from, Vec3 to) {
+        double distance = from.distanceTo(to);
+        int steps = Math.max(1, (int) Math.ceil(distance / MAX_STEP_DISTANCE));
+        for (int i = 1; i <= steps; i++) {
+            Vec3 point = from.add(to.subtract(from).scale((double) i / steps));
+            NetworkUtils.sendPacket(new ServerboundMovePlayerPacket.Pos(
+                    point.x, point.y, point.z,
+                    i == steps && player.onGround(), player.horizontalCollision));
+        }
     }
 
     private static void clearPending() {
